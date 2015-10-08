@@ -16,7 +16,6 @@ def get_images_and_labels(path):
 	image_paths = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.jpg')]
 	images = []
 	labels = []
-	count = 2000
 	for image_path in image_paths:
 		counter = 0
 		image_pil = Image.open(image_path).convert('L')
@@ -34,11 +33,8 @@ def get_images_and_labels(path):
 		for (x, y, w, h) in faces:
 			images.append(image[y: y + h, x: x + w])
 			counter +=1
-			#count += 1
 			labels.append(name*10+counter)
-			cv2.cv.SaveImage('{0}.jpg'.format(name*10+counter), cv2.cv.fromarray(image[y: y + h, x: x + w]))
-			#print (str(name*10+counter))
-			#cv2.waitKey(150)
+			
 	return images, labels
 
 def fix_faces(faces):
@@ -64,12 +60,9 @@ def fix_faces(faces):
 
 def webcam():
 	found = False
-	min_predict = 100000
 	dis = {} 
 	for i in range(100):
-		# Capture frame-by-frame
 		ret, frame = video_capture.read()
-		#cv2.cv.SaveImage('{0}.jpg'.format(counter2), cv2.cv.fromarray(frame))
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 				
 		faces = faceCascade.detectMultiScale(
@@ -80,42 +73,29 @@ def webcam():
 			flags=cv2.cv.CV_HAAR_SCALE_IMAGE
 		)
 		faces = fix_faces(faces)
-			
-		# Draw a rectangle around the faces
+		
 		for (x, y, w, h) in faces:
-			color = (0, 255, 0) if len(faces)==1 else (255, 0, 0)
-			nbr_predicted, conf = recognizer.predict(gray[y: y + h, x: x + w])
-			#cv2.cv.SaveImage('{0}.jpg'.format(counter), cv2.cv.fromarray(gray[y: y + h, x: x + w]))
-			#counter += 1
-			isbetter = True
-			if nbr_predicted not in dis:
-				dis[nbr_predicted] = [-conf]
-			elif len(dis[nbr_predicted])<10:
-				heapq.heappush(dis[nbr_predicted], -conf)
-			elif -conf > dis[nbr_predicted][0]:
-				heapq.heappop(dis[nbr_predicted])
-				heapq.heappush(dis[nbr_predicted], -conf)
-			else:
-				isbetter = False
-			
-			if isbetter:
-				cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-			
-		# Display the resulting frame
-		#cv2.imshow('Video', frame)
-		#if cv2.waitKey(1) & 0xFF == ord('q'): break
-		#for x in dis:
-		#	if len(dis[x])==10 and dis[x][0]>-100 : found = True
+			predict, conf = recognizer.predict(gray[y: y + h, x: x + w])
+			if predict not in dis:
+				dis[predict] = [-conf]
+			elif len(dis[predict])<10:
+				heapq.heappush(dis[predict], -conf)
+			elif -conf > dis[predict][0]:
+				heapq.heappop(dis[predict])
+				heapq.heappush(dis[predict], -conf)
 	
+	best_dis = 100000
+			
 	for x in dis:	dis[x] = [-int(v) for v in dis[x]]
 	for x in dis:	dis[x].sort()
 	for x in dis:
-		print 'Person %d : %d ... %d' % (x, dis[x][0], dis[x][-1])
+		best_dis = min(best_dis, dis[x][-1])
 		
-	# When everything is done, release the capture
 	video_capture.release()
 	cv2.destroyAllWindows()
-
+	
+	return best_dist
+	
 def main():
 	images, labels = get_images_and_labels(pathDB)
 	recognizer.train(images, np.array(labels))
